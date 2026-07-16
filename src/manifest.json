@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "Section Capture & OCR",
+  "version": "2.18.2",
+  "description": "웹 페이지에서 원하는 영역을 지정해 이미지(PNG/JPG)로 저장하고, OCR로 텍스트(TXT)를 추출합니다. 긴 캡처는 IndexedDB 타일 방식으로 저메모리 저장됩니다.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "unlimitedStorage",
+    "downloads"
+  ],
+  "host_permissions": [
+    "https://api.openai.com/*",
+    "https://api.anthropic.com/*",
+    "*://*.jjwxc.net/*",
+    "*://*.qidian.com/*",
+    "*://*.qdmm.com/*",
+    "https://docs.google.com/*",
+    "https://*.googleusercontent.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*.jjwxc.net/*", "*://*.qidian.com/*", "*://*.qdmm.com/*"],
+      "js": ["site-adapters.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["fonts/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Section Capture & OCR",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAkv7WNK5P/lJhXTXsi76D670sUhVN924SArxcGT3Ghc6h5swqaQek+9Fok1i2qCPG+vnp2Sz+gUE+6ZOFaBA0SaRR2NwEYEQYBNByDZh2VmxwkD0tUsve/++LDLEzLotN449G1xfVyicerU93mkYSXhHbV7B1VAi15Z3YMlHo4AfEUZvRkrJ8wSr+5TaUg1JdYyZEDZe3ebVreGHJBwAIqHSV938306wLvJfm7UjOIktxelfmTkaKeZ2ztsg+/wKIF7y03xQpk1vmctbwOVs7qAxiWbZE+Ee1T9EQaZGb4vWaL8gU3PLcF6P5l44mrYqi4WJ/elbATIHWYyLoiTpE6QIDAQAB",
+  "update_url": "https://raw.githubusercontent.com/rolloll/section-capture-ocr/main/update.xml"
+}

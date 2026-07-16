@@ -1,0 +1,8 @@
+Windows Registry Editor Version 5.00
+
+; Section Capture & OCR 확장 프로그램을 Chrome 정책으로 강제 설치하고
+; GitHub의 update.xml을 통해 자동 업데이트를 받도록 설정합니다.
+; 이 파일을 더블클릭한 뒤 Chrome을 재시작하세요.
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist]
+"1"="ighdgdopecnllkegbjmlpfcpjimgpfco;https://raw.githubusercontent.com/rolloll/section-capture-ocr/main/update.xml"

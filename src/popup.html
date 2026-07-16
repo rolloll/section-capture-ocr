@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<style>
+  body {
+    width: 260px;
+    margin: 0;
+    padding: 14px;
+    font-family: "Malgun Gothic", "Segoe UI", sans-serif;
+    background: #1e2430;
+    color: #e8ecf3;
+  }
+  h1 {
+    font-size: 14px;
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  button.mode {
+    display: block;
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border: none;
+    border-radius: 8px;
+    background: #2f81f7;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+  }
+  button.mode:hover { background: #1f6feb; }
+  button.mode small {
+    display: block;
+    font-weight: 400;
+    font-size: 11px;
+    opacity: .85;
+    margin-top: 3px;
+  }
+  button.mode.secondary { background: #384357; }
+  button.mode.secondary:hover { background: #46536c; }
+  .hint {
+    font-size: 11px;
+    color: #9aa6b8;
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+  #err {
+    color: #ff8181;
+    font-size: 11px;
+    margin-top: 6px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+  <h1>📸 Section Capture &amp; OCR</h1>
+
+  <button id="elementMode" class="mode">
+    🎯 요소(섹션) 선택 캡처
+    <small>클릭한 섹션 전체 캡처 — 화면보다 길어도 전체가 저장됨</small>
+  </button>
+
+  <button id="dragMode" class="mode secondary">
+    ✂️ 영역 드래그 캡처
+    <small>드래그 중 화면 가장자리에 대면 자동 스크롤 — 한 화면 넘는 범위도 OK</small>
+  </button>
+
+  <button id="textMode" class="mode secondary">
+    📝 텍스트 바로 저장
+    <small>글자로 된 본문 섹션을 클릭 → OCR 없이 즉시 TXT로 저장 (起点 등 텍스트 사이트용)</small>
+  </button>
+
+  <button id="pagedMode" class="mode secondary">
+    📖 연속 캡처 (뷰어용)
+    <small>본문 섹션 클릭으로 선택 → [다음] 버튼을 자동으로 눌러가며 최대 300화면</small>
+  </button>
+
+  <button id="openLast" class="mode secondary">
+    🗂️ 마지막 캡처 열기 (OCR / 저장)
+    <small>가장 최근 캡처 결과 창 다시 열기</small>
+  </button>
+
+  <div class="hint">캡처 후 열리는 창에서 PNG/JPG 저장과 OCR(중국어 간체/한국어/영어) → TXT 저장이 가능합니다. 드래그 중 마우스 휠 스크롤도 가능하며, ESC 키로 선택을 취소할 수 있습니다.</div>
+  <div id="err"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
