@@ -19,7 +19,7 @@ repository** — it's kept separately at `C:\Users\my\section-capture-ocr-signin
 If you lose this file you will not be able to re-sign under the same extension ID, so
 back it up (e.g. in a personal password manager or on an encrypted USB drive).
 
-## First-time install (same steps for your own PC or a friend's PC)
+## First-time install
 
 1. Clone this repository, or just download `registry/install_policy.reg` on its own.
 2. Double-click `install_policy.reg` → approve the UAC admin prompt → the policy is applied.
