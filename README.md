@@ -47,9 +47,5 @@ back it up (e.g. in a personal password manager or on an encrypted USB drive).
 
 ## Notes
 
-- This GitHub repository **must be Public** — raw.githubusercontent.com does not serve
-  private repositories without authentication, which would break auto-updates. It won't
-  show up in search, so in practice it's "private" only in the sense that you need to
-  know the URL.
 - An extension installed via the `ExtensionInstallForcelist` policy **cannot be removed
   or disabled by the user directly** — the administrator policy takes precedence.
