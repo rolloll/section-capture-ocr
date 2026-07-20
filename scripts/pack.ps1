@@ -10,8 +10,8 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-$pemPath = "C:\Users\my\section-capture-ocr-signing-key\section-capture-ocr.pem"
-$appId = "ighdgdopecnllkegbjmlpfcpjimgpfco"
+$pemPath = "C:\Keys\section-capture-ocr-signing-key\section-capture-ocr.pem"
+$appId = "kbfonkaboijchdncbogffgahonohiekj"
 $repo = "rolloll/section-capture-ocr"
 
 $manifest = Get-Content "$root\src\manifest.json" -Raw | ConvertFrom-Json

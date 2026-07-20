@@ -384,26 +384,136 @@
   // ---- 모드 C: 페이지 넘김 캡처 (카카오페이지 등 넘겨보는 뷰어) ----
   // 선택한 영역을 찍고 → 다음 페이지로 넘기고 → 다시 찍기를 반복해 세로로 이어붙인다.
   // 내용이 더 이상 바뀌지 않으면(마지막 페이지) 자동 종료한다.
+
+  // 뷰포트 좌표(x,y)가 (중첩) same-origin iframe 위에 있으면, elementFromPoint가 최상위
+  // 문서에서는 그 iframe 태그 자체만 반환하는 문제를 피하기 위해 iframe 내부까지 좌표를
+  // 보정해 가며 실제로 클릭돼야 할 문서/요소를 찾는다. bomtoon 같은 EPUB.js류 뷰어는
+  // 본문 전체가 same-origin iframe 안에 렌더링되는데, 그 iframe 태그에 synthetic
+  // 이벤트를 dispatch해 봐야 내부 문서로 전달되지 않아(브라우저가 실제 트러스티드 클릭만
+  // frame 경계를 넘겨 전달) 페이지가 전혀 넘어가지 않는다. cross-origin이라 접근이
+  // 막히면(contentDocument가 null) 그 지점에서 멈추고 그대로 반환한다.
+  // offX/offY는 찾아낸 문서의 좌표를 다시 최상위 프레임 뷰포트 좌표로 되돌리는 데 필요한
+  // 누적 오프셋 — 하이라이트 박스처럼 최상위 문서에 그리는 UI의 위치 계산이나, 캡처용
+  // rect를 문서(document) 좌표로 변환할 때 쓴다(요소/텍스트 선택 모드에서 사용).
+  function resolveDeepPoint(x, y) {
+    let doc = document, dx = x, dy = y, offX = 0, offY = 0;
+    for (let depth = 0; depth < 5; depth++) {
+      let el;
+      try { el = doc.elementFromPoint(dx, dy); } catch (_) { break; }
+      if (!el || el.tagName !== 'IFRAME') return { doc, el, x: dx, y: dy, offX, offY };
+      let innerDoc;
+      try { innerDoc = el.contentDocument; } catch (_) { innerDoc = null; }
+      if (!innerDoc) return { doc, el, x: dx, y: dy, offX, offY }; // cross-origin 등 접근 불가 — 여기서 중단
+      const r = el.getBoundingClientRect();
+      dx -= r.left; dy -= r.top;
+      offX += r.left; offY += r.top;
+      doc = innerDoc;
+    }
+    return { doc, el: doc.elementFromPoint(dx, dy), x: dx, y: dy, offX, offY };
+  }
+
+  // resolveDeepPoint와 같은 이유로, elementsFromPoint(복수 — 안티카피 투명 오버레이를
+  // 건너뛰고 실제 텍스트를 가진 요소를 찾을 때 필요)도 같은 방식으로 iframe 내부까지
+  // 보정한다.
+  function resolveDeepStack(x, y) {
+    let doc = document, dx = x, dy = y, offX = 0, offY = 0;
+    for (let depth = 0; depth < 5; depth++) {
+      let el;
+      try { el = doc.elementFromPoint(dx, dy); } catch (_) { break; }
+      if (!el || el.tagName !== 'IFRAME') break;
+      let innerDoc;
+      try { innerDoc = el.contentDocument; } catch (_) { innerDoc = null; }
+      if (!innerDoc) break;
+      const r = el.getBoundingClientRect();
+      dx -= r.left; dy -= r.top;
+      offX += r.left; offY += r.top;
+      doc = innerDoc;
+    }
+    let stack = [];
+    try { stack = doc.elementsFromPoint(dx, dy); } catch (_) { stack = []; }
+    return { stack, offX, offY };
+  }
+
+  // 최상위 document에 mousemove/click 리스너를 다는 것만으로는 bomtoon처럼 본문 전체가
+  // same-origin iframe 안에 있는 사이트를 다룰 수 없다 — iframe은 별도의 브라우징
+  // 컨텍스트라, 그 안에서 발생한 이벤트는 최상위 document로 절대 전달(버블링)되지 않는다
+  // (resolveDeepPoint/Stack으로 "어떤 요소인지" 알아내는 문제와는 별개로, 애초에 이벤트
+  // 자체가 감지되지 않는 문제 — 실측 확인: 최상위 document의 캡처 리스너는 iframe 안쪽
+  // 클릭에 전혀 반응하지 않고, iframe.contentDocument에 직접 단 리스너만 반응함).
+  // 그래서 요소/텍스트 선택 모드는 최상위 document뿐 아니라, 재귀적으로 찾아낸 모든
+  // same-origin iframe 문서에도 동일한 리스너를 "미러링"해서 달아야 한다.
+  function collectInteractiveDocs(doc, offX, offY, depth, out) {
+    out.push({ doc, offX, offY });
+    if (depth <= 0) return out;
+    let iframes;
+    try { iframes = doc.querySelectorAll('iframe'); } catch (_) { return out; }
+    for (const f of iframes) {
+      let inner;
+      try { inner = f.contentDocument; } catch (_) { inner = null; }
+      if (!inner) continue; // cross-origin 등 접근 불가 — 건너뜀
+      const r = f.getBoundingClientRect(); // f를 담고 있는 doc의 뷰포트 기준 좌표
+      collectInteractiveDocs(inner, offX + r.left, offY + r.top, depth - 1, out);
+    }
+    return out;
+  }
+
+  // 요소/텍스트 선택 모드 공용: 최상위 document + 모든 same-origin iframe 문서에 같은
+  // mousemove/click(/keydown) 핸들러를 단다. iframe 쪽 이벤트는 clientX/Y에 그 문서의
+  // 누적 오프셋을 더해 최상위 프레임 뷰포트 좌표로 바꾼 뒤 그대로 handleMove/handleClick에
+  // 넘긴다 — 그래서 resolveDeepPoint/Stack 등 나머지 로직은 항상 "최상위 프레임 좌표"만
+  // 알면 되고 이벤트가 어느 문서에서 왔는지는 신경 쓸 필요가 없다. keydown은 handleKey를
+  // 참조 그대로 등록해, 최상위 document 쪽은 (cancelSelection이 이미 관리하는) 기존
+  // onKey 리스너와 같은 참조라서 중복 등록되지 않는다.
+  function attachAcrossFrames(handleMove, handleClick, handleKey) {
+    const docs = collectInteractiveDocs(document, 0, 0, 4, []);
+    const bound = docs.map(({ doc, offX, offY }) => {
+      const mm = (e) => handleMove({ clientX: e.clientX + offX, clientY: e.clientY + offY });
+      const ck = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        handleClick({
+          clientX: e.clientX + offX, clientY: e.clientY + offY,
+          preventDefault() {}, stopPropagation() {}
+        });
+      };
+      doc.addEventListener('mousemove', mm, true);
+      doc.addEventListener('click', ck, true);
+      if (handleKey) doc.addEventListener('keydown', handleKey, true);
+      return { doc, mm, ck };
+    });
+    return () => {
+      bound.forEach(({ doc, mm, ck }) => {
+        doc.removeEventListener('mousemove', mm, true);
+        doc.removeEventListener('click', ck, true);
+        if (handleKey) doc.removeEventListener('keydown', handleKey, true);
+      });
+    };
+  }
+
   function advancePage(strategy, clip, blocker) {
+    const x = clip.x + clip.w - Math.min(24, clip.w * 0.08);
+    const y = clip.y + clip.h / 2;
+    blocker.style.pointerEvents = 'none';
+    const resolved = resolveDeepPoint(x, y);
+    blocker.style.pointerEvents = 'auto';
+    const view = resolved.doc.defaultView || window;
+
     if (strategy === 'key') {
       const opts = {
         key: 'ArrowRight', code: 'ArrowRight', keyCode: 39, which: 39,
         bubbles: true, cancelable: true
       };
-      document.dispatchEvent(new KeyboardEvent('keydown', opts));
-      document.dispatchEvent(new KeyboardEvent('keyup', opts));
+      const target = resolved.doc.body || resolved.doc;
+      target.dispatchEvent(new view.KeyboardEvent('keydown', opts));
+      target.dispatchEvent(new view.KeyboardEvent('keyup', opts));
     } else {
       // 선택 영역 오른쪽 끝 클릭 (뷰어의 "다음 페이지" 영역)
-      const x = clip.x + clip.w - Math.min(24, clip.w * 0.08);
-      const y = clip.y + clip.h / 2;
-      blocker.style.pointerEvents = 'none';
-      const el = document.elementFromPoint(x, y) || document.body;
+      const el = resolved.el || resolved.doc.body;
       for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
-        el.dispatchEvent(new MouseEvent(type, {
-          bubbles: true, cancelable: true, clientX: x, clientY: y, view: window
+        el.dispatchEvent(new view.MouseEvent(type, {
+          bubbles: true, cancelable: true, clientX: resolved.x, clientY: resolved.y, view
         }));
       }
-      blocker.style.pointerEvents = 'auto';
     }
   }
 
@@ -1018,11 +1128,17 @@
 
     let current = null;
 
+    // bomtoon 같은 EPUB.js류 뷰어는 본문이 same-origin iframe 안에 있어 최상위 문서의
+    // elementFromPoint로는 항상 iframe 태그 자체만 잡힌다. resolveDeepPoint로 iframe
+    // 내부까지 들어가 실제 요소를 찾고, offX/offY로 그 요소의 rect를 최상위 문서(뷰포트)
+    // 좌표로 되돌린다.
     const onMove = (e) => {
-      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const resolved = resolveDeepPoint(e.clientX, e.clientY);
+      const el = resolved.el;
       if (!el || el === highlight || el === label || el === toast) return;
-      current = el;
-      const r = el.getBoundingClientRect();
+      current = { el, offX: resolved.offX, offY: resolved.offY };
+      const r0 = el.getBoundingClientRect();
+      const r = { left: r0.left + resolved.offX, top: r0.top + resolved.offY, width: r0.width, height: r0.height };
       Object.assign(highlight.style, {
         display: 'block',
         left: r.left + 'px', top: r.top + 'px',
@@ -1041,7 +1157,8 @@
       e.preventDefault();
       e.stopPropagation();
       if (!current) return;
-      const r = current.getBoundingClientRect();
+      const r0 = current.el.getBoundingClientRect();
+      const r = { left: r0.left + current.offX, top: r0.top + current.offY, right: r0.right + current.offX, bottom: r0.bottom + current.offY };
       // 선택 요소의 화면 영역을 뷰포트 안으로 잘라 연속 캡처 시작점으로 사용
       const clip = {
         x: Math.max(0, r.left),
@@ -1056,19 +1173,15 @@
       capturePagedMode(clip);
     };
 
-    document.addEventListener('mousemove', onMove, true);
-    document.addEventListener('click', onClick, true);
-
     const onKey = (e) => { if (e.key === 'Escape') cancelSelection(); };
-    document.addEventListener('keydown', onKey, true);
+    // iframe 내부 이벤트는 최상위 document로 버블링되지 않으므로 attachAcrossFrames로
+    // 최상위 document + 모든 same-origin iframe 문서에 함께 리스너를 단다.
+    const detach = attachAcrossFrames(onMove, onClick, onKey);
 
     ui = {
       elements: [highlight, label, toast],
       onKey,
-      cleanup() {
-        document.removeEventListener('mousemove', onMove, true);
-        document.removeEventListener('click', onClick, true);
-      }
+      cleanup: detach
     };
   }
 
@@ -1286,6 +1399,15 @@
       resize: 'none'
     });
 
+    const withSpaces = text.length;
+    const withoutSpaces = text.replace(/\s/g, '').length;
+    const statsRow = document.createElement('div');
+    statsRow.textContent =
+      `공백 포함 ${withSpaces.toLocaleString()}자 / 공백 미포함 ${withoutSpaces.toLocaleString()}자`;
+    Object.assign(statsRow.style, {
+      padding: '0 16px 10px', fontSize: '12px', color: '#9aa6b8', textAlign: 'right'
+    });
+
     const foot = document.createElement('div');
     Object.assign(foot.style, { display: 'flex', gap: '8px', justifyContent: 'flex-end', padding: '10px 16px 14px' });
     const mkBtn = (txt, primary) => {
@@ -1303,7 +1425,7 @@
     const saveB = mkBtn('💾 TXT 저장', true);
     foot.append(cancelB, copyB, saveB);
 
-    box.append(head, nameRow, saveAsRow, pre, foot);
+    box.append(head, nameRow, saveAsRow, pre, statsRow, foot);
     back.appendChild(box);
     document.documentElement.appendChild(back);
     nameInput.focus();
@@ -1360,17 +1482,24 @@
     // elementsFromPoint()(복수)로 클릭 지점의 요소들을 위에서부터 훑어
     // 실제 텍스트를 가진 첫 요소를 고른다. 텍스트 있는 요소가 하나도 없으면
     // (진짜 이미지/버튼 등) 기존처럼 맨 위 요소를 그대로 쓴다.
+    // bomtoon 같은 EPUB.js류 뷰어는 본문이 same-origin iframe 안에 있어 최상위 문서의
+    // elementsFromPoint로는 iframe 태그만 잡히므로, resolveDeepStack으로 iframe 내부까지
+    // 들어가 실제 스택을 얻는다 — offX/offY는 그 내부 요소의 rect를 최상위 문서(하이라이트
+    // 박스가 그려지는 곳) 좌표로 되돌리는 데 쓴다.
     const pickAt = (x, y) => {
-      const stack = document.elementsFromPoint(x, y);
+      const { stack, offX, offY } = resolveDeepStack(x, y);
       const real = stack.filter((el) => el && el !== highlight && el !== label && el !== toast);
-      return real.find((el) => (el.innerText || '').trim().length > 0) || real[0] || null;
+      const el = real.find((el) => (el.innerText || '').trim().length > 0) || real[0] || null;
+      return el ? { el, offX, offY } : null;
     };
 
     const onMove = (e) => {
-      const el = pickAt(e.clientX, e.clientY);
-      if (!el) return;
+      const picked = pickAt(e.clientX, e.clientY);
+      if (!picked) return;
+      const { el, offX, offY } = picked;
       current = el;
-      const r = el.getBoundingClientRect();
+      const r0 = el.getBoundingClientRect();
+      const r = { left: r0.left + offX, top: r0.top + offY, width: r0.width, height: r0.height };
       Object.assign(highlight.style, {
         display: 'block',
         left: r.left + 'px', top: r.top + 'px',
@@ -1397,19 +1526,18 @@
       showTextPreview(text); // Listly식 미리보기 창을 띄운다
     };
 
-    document.addEventListener('mousemove', onMove, true);
-    document.addEventListener('click', onClick, true);
-
     const onKey = (e) => { if (e.key === 'Escape') cancelSelection(); };
-    document.addEventListener('keydown', onKey, true);
+    // bomtoon처럼 본문이 same-origin iframe 안에 있는 사이트는 최상위 document에만
+    // 리스너를 달면 그 안에서 일어나는 클릭/마우스이동을 아예 감지하지 못한다(iframe은
+    // 별도 브라우징 컨텍스트라 이벤트가 프레임 경계를 넘어 버블링되지 않음) — 그래서
+    // attachAcrossFrames로 최상위 document와 모든 same-origin iframe 문서에 동일 리스너를
+    // 함께 단다.
+    const detach = attachAcrossFrames(onMove, onClick, onKey);
 
     ui = {
       elements: [highlight, label, toast],
       onKey,
-      cleanup() {
-        document.removeEventListener('mousemove', onMove, true);
-        document.removeEventListener('click', onClick, true);
-      }
+      cleanup: detach
     };
   }
 
@@ -1536,11 +1664,17 @@
 
     let current = null;
 
+    // bomtoon 같은 EPUB.js류 뷰어는 본문이 same-origin iframe 안에 있어 최상위 문서의
+    // elementFromPoint로는 항상 iframe 태그 자체만 잡힌다(섹션 하나하나가 아니라 뷰어
+    // 전체가 하나의 "요소"로만 선택됨). resolveDeepPoint로 iframe 내부까지 들어가 실제
+    // 요소를 찾고, offX/offY로 그 요소의 rect를 최상위 문서 좌표로 되돌린다.
     const onMove = (e) => {
-      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const resolved = resolveDeepPoint(e.clientX, e.clientY);
+      const el = resolved.el;
       if (!el || el === highlight || el === label || el === toast) return;
-      current = el;
-      const r = el.getBoundingClientRect();
+      current = { el, offX: resolved.offX, offY: resolved.offY };
+      const r0 = el.getBoundingClientRect();
+      const r = { left: r0.left + resolved.offX, top: r0.top + resolved.offY, width: r0.width, height: r0.height };
       Object.assign(highlight.style, {
         display: 'block',
         left: r.left + 'px', top: r.top + 'px',
@@ -1559,28 +1693,24 @@
       e.preventDefault();
       e.stopPropagation();
       if (!current) return;
-      const r = current.getBoundingClientRect();
+      const r0 = current.el.getBoundingClientRect();
       finishSelection({
-        x: r.left + window.scrollX,
-        y: r.top + window.scrollY,
-        w: r.width,
-        h: r.height
+        x: r0.left + current.offX + window.scrollX,
+        y: r0.top + current.offY + window.scrollY,
+        w: r0.width,
+        h: r0.height
       }, startElementSelect);
     };
 
-    document.addEventListener('mousemove', onMove, true);
-    document.addEventListener('click', onClick, true);
-
     const onKey = (e) => { if (e.key === 'Escape') cancelSelection(); };
-    document.addEventListener('keydown', onKey, true);
+    // iframe 내부 이벤트는 최상위 document로 버블링되지 않으므로 attachAcrossFrames로
+    // 최상위 document + 모든 same-origin iframe 문서에 함께 리스너를 단다.
+    const detach = attachAcrossFrames(onMove, onClick, onKey);
 
     ui = {
       elements: [highlight, label, toast],
       onKey,
-      cleanup() {
-        document.removeEventListener('mousemove', onMove, true);
-        document.removeEventListener('click', onClick, true);
-      }
+      cleanup: detach
     };
   }
 })();

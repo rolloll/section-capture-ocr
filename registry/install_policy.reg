@@ -5,4 +5,4 @@ Windows Registry Editor Version 5.00
 ; 이 파일을 더블클릭한 뒤 Chrome을 재시작하세요.
 
 [HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\ExtensionInstallForcelist]
-"1"="ighdgdopecnllkegbjmlpfcpjimgpfco;https://raw.githubusercontent.com/rolloll/section-capture-ocr/main/update.xml"
+"1"="kbfonkaboijchdncbogffgahonohiekj;https://raw.githubusercontent.com/rolloll/section-capture-ocr/main/update.xml"

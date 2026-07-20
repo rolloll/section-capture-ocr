@@ -12,12 +12,22 @@ on the owner's own PC and a friend's PC and **actually auto-updates**.
 - `registry/install_policy.reg` — Windows policy file, applied once per PC
 - `scripts/pack.ps1` — packaging script for cutting a new release
 
-Fixed extension ID: `ighdgdopecnllkegbjmlpfcpjimgpfco`
+Fixed extension ID: `kbfonkaboijchdncbogffgahonohiekj`
+
+> **Key rotation history**: the original signing key (extension ID
+> `ighdgdopecnllkegbjmlpfcpjimgpfco`, used through the `2.18.2` release) was lost —
+> the `.pem` never actually existed at the path this README used to point to. A new
+> keypair was generated for the `2.18.7` release, which is why the extension ID
+> changed. PCs that installed the old ID via the registry policy will **not**
+> auto-update to the new ID; `registry/install_policy.reg` must be re-applied (it now
+> points at the new ID) and the old extension removed/replaced manually.
 
 The private signing key (`section-capture-ocr.pem`) is **not included in this
-repository** — it's kept separately at `C:\Users\my\section-capture-ocr-signing-key\`.
-If you lose this file you will not be able to re-sign under the same extension ID, so
-back it up (e.g. in a personal password manager or on an encrypted USB drive).
+repository** — it's kept separately at `C:\Keys\section-capture-ocr-signing-key\`
+(deliberately outside OneDrive/any synced folder, since a signing key shouldn't leave
+this PC). If you lose this file you will not be able to re-sign under the same
+extension ID, so back it up (e.g. in a personal password manager or on an encrypted
+USB drive) — this has already happened once.
 
 ## First-time install
 
