@@ -31,15 +31,30 @@ USB drive) — this has already happened once.
 
 ## First-time install
 
-1. Clone this repository, or just download `registry/install_policy.reg` on its own.
-2. Double-click `install_policy.reg` → approve the UAC admin prompt → the policy is applied.
-3. Fully quit Chrome and relaunch it.
+### Option A — Load unpacked (simplest, no admin rights needed, recommended for a friend's PC)
+
+1. Click the green **Code** button on the GitHub repo page → **Download ZIP**, then extract it.
+   This gives you a folder like `section-capture-ocr-main\`.
+2. Go to `chrome://extensions`, turn on **Developer mode** (top right).
+3. Click **Load unpacked**.
+4. **Important**: select the **`src`** folder *inside* the extracted folder — not the
+   extracted folder itself. (`manifest.json` lives in `src/`; picking the outer folder
+   fails silently/with an error and is the most common reason people say "it doesn't
+   run" after downloading from GitHub.)
+5. The 📸 icon should appear in the toolbar. This path does **not** auto-update — repeat
+   steps 1–4 with a fresh download to get a new version.
+
+### Option B — Registry-forced install (auto-updates, needs admin rights on that PC)
+
+1. Download `registry/install_policy.reg` (on its own, or from a full clone).
+2. Double-click it → approve the UAC admin prompt → the policy is applied.
+3. Fully quit Chrome (all windows) and relaunch it.
 4. Go to `chrome://extensions` and click **Update extensions** in the top right
    (or just wait — Chrome will install it automatically within a few hours).
 5. It will show up as an **"installed by your administrator"** extension, which can't
-   be removed or disabled afterward. If you'd rather be free to turn it on/off at will,
-   load the `src/` folder directly via **Load unpacked** instead (this path does not
-   get automatic updates).
+   be removed or disabled afterward. This requires the PC's Chrome to be able to reach
+   `raw.githubusercontent.com` and the signed-in Windows account to have local admin
+   rights (UAC) — if either isn't true, use Option A instead.
 
 ## Releasing a new version
 

@@ -10,10 +10,15 @@ OCR은 [Tesseract.js](https://github.com/naptha/tesseract.js)를 사용하며,
 
 ## 설치 방법 (개발자 모드 로드)
 
+> **GitHub에서 저장소 전체를 ZIP으로 내려받은 경우 주의**: 압축을 풀면
+> `section-capture-ocr-main` 같은 폴더가 생기는데, 그 폴더를 바로 선택하면
+> 안 됩니다(그 폴더에는 `manifest.json`이 없어 "압축해제된 확장 프로그램을
+> 로드합니다"가 실패합니다). 반드시 그 안의 **`src` 폴더**를 선택하세요.
+
 1. Chrome 주소창에 `chrome://extensions` 입력
 2. 우측 상단 **개발자 모드** 켜기
 3. **압축해제된 확장 프로그램을 로드합니다** 클릭
-4. 이 폴더(`section-capture-ocr`)를 선택
+4. 이 폴더(`manifest.json`이 들어있는 `src` 폴더)를 선택
 5. 툴바에 📸 아이콘이 나타나면 설치 완료
 
 ## 사용 방법
